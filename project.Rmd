@@ -1,0 +1,742 @@
+---
+title: "A Tale of Two Engineers"
+author: "Terry Tian"
+date: "2025-01-25"
+output: html_document
+---
+
+
+```{css, echo=FALSE}
+
+h1.title {
+  margin-top: 30px;
+  font-size: 36px;   
+  font-weight: bold;  
+  text-align: center;
+  font-family: serif;
+}
+
+h4.author {
+  font-size: 16px; 
+  font-style: italic;
+  text-align: center;
+  font-family: serif;
+
+}
+
+h4.date {
+  font-size: 16px;
+  text-align: center;
+  color: #555;
+  font-family: serif;
+
+}
+
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+
+h1.title {
+  font-size: 30px;
+}
+
+```
+
+
+```{r load-libraries, include=FALSE}
+
+library(reticulate)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(data.table)
+library(jsonlite)
+library(kableExtra)
+library(tidyr)
+library(gridExtra)
+library(leaflet)
+library(tidygeocoder)
+library(ggmap)
+library(stringr)
+library(purrr)
+library(spacyr)
+library(scales)
+
+
+spacy_install()
+spacy_initialize(model = "en_core_web_sm")
+
+```
+
+**Github link**: https://github.com/TerryTian21/JSC370-Final-Project
+
+## Introduction
+
+### Abstract
+
+&emsp; A [report](https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE) by the FRED (Federal Reserve of St. Louis) on labour market conditions highlighted a drastic change in software engineer job postings within the past 5 years. Indexed on $Feb 1, 2020 = 100$, the number of postings expoentially increaes peaking in early 2022 (Index = 240). Yet, seemingly just as rapid, the number of postings fell to a low in late 2023. With numerous tech-unicorns annoucing unprecedneted layoff numbers, the tech bubble has appeared to burst. This  paper will evalute the software/data engineering market in 2021 and 2023, showing the differences in available roles, postings by location, and employee skillset requirements. 
+
+
+
+```{r FRED-graph, fig.align='center', fig.cap=fred_caption, echo=FALSE}
+
+fred <- fread("data/fred.csv")
+colnames(fred) <- c("Date", "Index")
+
+fred_caption <- "Figure 1: Line chart of Indeed jobs postings with baseline Feb 1, 2020. The chart is seasonally adjusted on historic patterns in 2017-2019. Each series, including the national trend, occupational sectors, and sub-national geographies, is seasonally adjusted separately."
+
+ggplot(fred, aes(x = Date, y = Index)) +
+  geom_line(color = "royalblue") +
+  theme_bw() + 
+  labs(
+    x = "Date",
+    y = "Index (Feb 1, 2020 = 100) ",
+    title = "Software Engineering Postings on Indeed",
+  ) +
+  theme(
+     plot.title = element_text(size = 12, face = "bold", margin = ggplot2::margin(b=10, t=10))
+     )
+
+
+```
+
+### Hypothesis
+
+The two main questions of interest are as follows:
+
+1. What are the differences between 2021 and 2023 postings
+2. Can we use posting-metadata to predict salaries
+
+The goal of this paper is to provide clarity into why so many engineers have been struggling to find employment opportunities in North America. Three datasets are used to answer the above questions; 2 Kaggle Datasets and a dataset found on Github.
+
+
+## Methods
+
+### Data Summary
+
+&emsp; The first Kaggle dataset was procured by [Yazeed Fares](https://www.kaggle.com/datasets/yazeedfares/software-engineering-jobs-dataset), titled Software Engineering Jobs Dataset. The dataset contains 9380 observations and 8 features and was collected via scrapping LinkedIn Jobs. While the scrapping was performed on Dec. 25, 2023, not all jobs were posted on that specific as LinkedIn retains job postings can stay open for up to 6 months. For the purpose of this exploration, we will assume the jobs in this dataset are respresentative of postings from the latter half of 2023.
+
+&emsp; The second dataset was developed by [Mike Lawrence](https://www.kaggle.com/datasets/emreksz/software-engineer-jobs-and-salaries-2024/data), a Machine Learning Engineer at Google. The dataset contains 8261 observations and 13 features. Similarily, this dataset was also collected from scraped LinkedIn postings; collected in October 2021. 
+
+
+```{r load-data, echo = FALSE, results='hide'}
+
+postings_2021 <- fread("./data/2021.csv")
+postings_2023 <- fread("./data/2023.csv")
+
+```
+
+```{r data-dim, echo = FALSE, results='hide'}
+
+cat("Dimensions of 2021 Dataset:", dim(postings_2021), "\n")
+cat("Dimensions of 2023 Dataset:", dim(postings_2023))
+
+```
+
+```{r parameters-names, include=FALSE}
+
+kable(names(postings_2021), col.names="Parameters", format = "html", table.attr = "style='width:50%;'") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "bordered"))
+
+kable(names(postings_2023), col.names="Parameters", format = "html", table.attr = "style='width:50%;'") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "bordered"))
+
+```
+
+&emsp; Both datasets contain metadata for postings, but not all columns align, and hence we will subset both datasets into matching features for the purpose of comparison. The variables of interes are listed below. After subsetting the data, all NA values are removed.
+
+
+```{r join-data, echo=FALSE, results='hide'}
+
+filtered_2021 <- postings_2021 %>% select(
+  Company = company,
+  Description = description,
+  Title = title,
+  Location = location,
+  Seniority = `Seniority level`
+) %>% mutate(
+  Year = factor(2021)
+) 
+
+filtered_2023 <- postings_2023 %>% select(
+  Company = company,
+  Location = job_location,
+  Title = job_title,
+  Description = job_summary,
+  Seniority =`job level`
+) %>% 
+  mutate(
+    Year = factor(2023)
+  )
+
+postings <- rbind(filtered_2021, filtered_2023)
+
+```
+
+```{r postings-features-table, echo = FALSE}
+
+postings_data <- data.frame(
+  Variables = names(postings),
+  Type = unname(sapply(postings, class)),
+  Description = c(
+    "Name of Company", 
+    "Description of job including but not limited to company overview, requirements, skillset", 
+    "Name of position",
+    "Location of Job",
+    "Classification of role based on experience, technical expertise, leadership responsibilities",
+    "Year the Job was Posted")
+)
+
+posting_table_caption <- "Figure 2: Summary and Description of Variables of Interest for 2021 and 2023 Datasets"
+
+kable(postings_data, caption=posting_table_caption, format = "html", table.attr = "style='width:50%;'") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "bordered"))
+
+
+```
+
+
+### Data Wrangling
+
+**Titles**
+
+&emsp; Due to the structure of job titles additional data-wrangling as requirement to get proper categoriazation. For example, variance between each posting could result in different titles corrospond to the same type of position (e.g. Sr. Software Engineer vs. Senior Software Engineer). This would affect `group_by()` functions, resulting in many more categories than necessary. As a result, custom title's are defined based on keyword matches. Using the `case_when()` function, titles are classified from spefic to generic. Thus a title such as "Front-end Software Engineer" gets classified as Frontend Software Engineer rather than Software Engineer.
+
+
+```{r wrangle-titles, echo=FALSE, results='hide'}
+
+title_2021 <- filtered_2021 %>% mutate(
+    Role = case_when(
+      str_detect(Title, regex("Test|Quality|QA", ignore_case=TRUE)) ~ "QA Engineer",
+      str_detect(Title, regex("Data Scientist", ignore_case=TRUE)) ~ "Data Scientist",
+      str_detect(Title, regex("Machine Learning", ignore_case=TRUE)) ~ "Machine Learning Engineer",
+      str_detect(Title, regex("full stack|full-stack", ignore_case=TRUE)) ~ "Full Stack Engineer",
+      str_detect(Title, regex("Front-end|front end|frontent", ignore_case=TRUE)) ~ "Front End Engineer",
+      str_detect(Title, regex("Site Reliability|site-reliability", ignore_case=TRUE)) ~ "Site Reliability Engineer",
+      str_detect(Title, regex("Back-end|backend|backend", ignore_case=TRUE)) ~ "Back End Engineer",
+      str_detect(Title, regex("Embedded|System", ignore_case=TRUE)) ~ "Embedded Systems Engineer",
+      str_detect(Title, regex("Mobile|iOS|Android", ignore_case=TRUE)) ~ "Mobile Software Engineer",
+      str_detect(Title, regex("Security|Cyber", ignore_case=TRUE)) ~ "Security Engineer",
+      str_detect(Title, regex("Data", ignore_case=TRUE)) ~ "Data Engineer",
+      str_detect(Title, regex("Devops", ignore_case=TRUE)) ~ "Devops Engineer",
+      str_detect(Title, regex("Cloud", ignore_case=TRUE)) ~ "Cloud Engineer",
+      str_detect(Title, regex("Research|Scientist", ignore_case=TRUE)) ~ "Research Engineer",
+      str_detect(Title, regex("Software", ignore_case=TRUE)) ~ "Software Engineer",
+      TRUE ~ "Other"
+  )
+) %>% group_by(Role) %>% 
+  summarise(Count = n())
+
+title_2023 <- filtered_2023 %>% mutate(
+    Role = case_when(
+      str_detect(Title, regex("Test|Quality|QA", ignore_case=TRUE)) ~ "QA Engineer",
+      str_detect(Title, regex("Data Scientist", ignore_case=TRUE)) ~ "Data Scientist",
+      str_detect(Title, regex("Machine Learning|AI|Artificial Intelligence", ignore_case=TRUE)) ~ "Machine Learning Engineer",
+      str_detect(Title, regex("full stack|full-stack", ignore_case=TRUE)) ~ "Full Stack Engineer",
+      str_detect(Title, regex("Front-end|front end|frontend", ignore_case=TRUE)) ~ "Front End Engineer",
+      str_detect(Title, regex("Site Reliability|site-reliability", ignore_case=TRUE)) ~ "Site Reliability Engineer",
+      str_detect(Title, regex("Back-end|backend|backend", ignore_case=TRUE)) ~ "Back End Engineer",
+      str_detect(Title, regex("Embedded|System", ignore_case=TRUE)) ~ "Embedded Systems Engineer",
+      str_detect(Title, regex("Mobile|iOS|Android", ignore_case=TRUE)) ~ "Mobile Software Engineer",
+      str_detect(Title, regex("Security|Cyber", ignore_case=TRUE)) ~ "Security Engineer",
+      str_detect(Title, regex("Data", ignore_case=TRUE)) ~ "Data Engineer",
+      str_detect(Title, regex("Devops", ignore_case=TRUE)) ~ "Devops Engineer",
+      str_detect(Title, regex("Cloud", ignore_case=TRUE)) ~ "Cloud Engineer",
+      str_detect(Title, regex("Research|Scientist", ignore_case=TRUE)) ~ "Research Engineer",
+      str_detect(Title, regex("Software", ignore_case=TRUE)) ~ "Software Engineer",
+      TRUE ~ "Other"
+  )
+) %>% group_by(Role) %>% 
+  summarise(Count = n())
+
+```
+
+```{r role-reatures-table, echo=FALSE}
+
+role_patterns <- c(
+  "Back End Engineer" = "Back-end, backend",
+  "Cloud Engineer" = "Cloud",
+  "Data Engineer" = "Data",
+  "Data Scientist" = "Data Scientist",
+  "DevOps Engineer" = "Devops",
+  "Embedded Systems Engineer" = "Embedded, System",
+  "Front End Engineer" = "Front-end, front end, frontend",
+  "Full Stack Engineer" = "full stack|full-stack",
+  "Machine Learning Engineer" = "Machine Learning, AI, Artificial Intelligence",
+  "Mobile Software Engineer" = "Mobile, iOS, Android",
+  "Other" = ".*", 
+  "QA Engineer" = "Test, Quality, QA",
+  "Research Engineer" = "Research, Scientist",
+  "Security Engineer" = "Security, Cyber",
+  "Site Reliability Engineer" = "Site Reliability, site-reliability",
+  "Software Engineer" = "Software"
+)
+
+role_df <- data.frame(
+  Title = names(role_patterns),
+  Pattern = unname(role_patterns),
+  stringsAsFactors = FALSE
+)
+
+role_patterns_caption <- "Figure 3: Regex used to create classification levels for posting titles."
+
+kable(role_df, caption=role_patterns_caption, format = "html", table.attr = "style='width:50%;'") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "bordered"))
+
+```
+
+
+**Seniority**
+
+&emsp; Analogous to titles, seniority levels are rather inconsistent between the 2 datasets. In the 2021 dataset are 8 levels of seniority while the 2023 dataset only contains 2 classifications. In order to maintain homogeneity between the classifications in both datasets, custom Seniority levels are defined based on keywords in the title (e.g. Staff ~ Staff Level).
+
+```{r wrangle-seniority, echo=FALSE, results='hide'}
+
+filtered_2021 <- filtered_2021 %>% mutate(
+  Seniority = case_when(
+    str_detect(Title, regex("Principal", ignore_case=TRUE)) ~ "Principal",
+    str_detect(Title, regex("Staff", ignore_case=TRUE)) ~ "Staff",
+    str_detect(Title, regex("Lead", ignore_case=TRUE)) ~ "Lead",
+    str_detect(Title, regex("Sr.|Sr|Senior|III", ignore_case=TRUE)) ~ "Senior",
+    str_detect(Title, regex("Founding", ignore_case=TRUE)) ~ "Founding",
+    str_detect(Title, regex("Manager", ignore_case=TRUE)) ~ "Manager",
+    str_detect(Title, regex("Entry Level|Junior|Entry-Level|Graduate|Jr.|II|Jr|\\bI\\b", ignore_case=TRUE)) ~ "Junior",
+    Seniority %in% c("Entry level", "Associate") ~ "Junior",
+    Seniority == "Mid-Senior level" ~ "Senior",
+    .default = "None Specified"  # keep other original values
+  )
+)
+
+
+filtered_2023 <- filtered_2023 %>% mutate(
+  Seniority = case_when(
+    str_detect(Title, regex("Principal", ignore_case=TRUE)) ~ "Principal",
+    str_detect(Title, regex("Staff", ignore_case=TRUE)) ~ "Staff",
+    str_detect(Title, regex("Lead", ignore_case=TRUE)) ~ "Lead",
+    str_detect(Title, regex("Sr.|Sr|Senior|III", ignore_case=TRUE)) ~ "Senior",
+    str_detect(Title, regex("Founding", ignore_case=TRUE)) ~ "Founding",
+    str_detect(Title, regex("Manager", ignore_case=TRUE)) ~ "Manager",
+    str_detect(Title, regex("Entry Level|Junior|Entry-Level|Graduate|Jr.|II|Jr|\\bI\\b", ignore_case=TRUE)) ~ "Junior",
+    .default = "None Specified"  # keep other original values
+  )
+)
+
+```
+
+```{r seniority-features-table, echo=FALSE}
+
+seniority_df <- data.frame(
+  Seniority = c(
+    "Principal", 
+    "Staff", 
+    "Lead", 
+    "Senior", 
+    "Founding", 
+    "Manager", 
+    "Junior", 
+    "Junior", 
+    "Senior", 
+    "None Specified"
+  ),
+  Pattern = c(
+    "Principal",
+    "Staff",
+    "Lead",
+    "Sr., Sr, Senior, III",
+    "Founding",
+    "Manager",
+    "Entry Level, Junior, Entry-Level, Graduate, Jr., II, Jr, I",
+    "Entry level, Associate",
+    "Mid-Senior level",
+    ".*"
+  ),
+  stringsAsFactors = FALSE
+)
+
+seniority_patterns_caption <- "Figure 4: Regex used to create classification levels for posting Seniority Level"
+
+kable(seniority_df, caption=seniority_patterns_caption, format = "html", table.attr = "style='width:50%;'") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "bordered"))
+
+
+```
+
+
+**GeoData**
+
+&emsp; Additionaly wrangling as required to plot Postings Count ~ Location. The provided location data only contains posting location formatted by `City, State`. With a little experimentation, the data was best visualized, grouped by state and hence, latitude and longitude coordinate translation was required. After extracting the State from each location string, the [Google Geocoding API](https://developers.google.com/maps/documentation/geocoding/overview) is used to place coordinates for each state. Entries located outside of the US or with incorrect formatting were dropped leaving 7258 from 2021 and 6948 from 2023.
+
+```{r state-mappings, echo= FALSE, results='hide'}
+
+state_mapping <- c(
+  # USA States
+  "AL" = "Alabama", "AK" = "Alaska", "AZ" = "Arizona", "AR" = "Arkansas", "CA" = "California",
+  "CO" = "Colorado", "CT" = "Connecticut", "DE" = "Delaware", "FL" = "Florida", "GA" = "Georgia",
+  "HI" = "Hawaii", "ID" = "Idaho", "IL" = "Illinois", "IN" = "Indiana", "IA" = "Iowa",
+  "KS" = "Kansas", "KY" = "Kentucky", "LA" = "Louisiana", "ME" = "Maine", "MD" = "Maryland",
+  "MA" = "Massachusetts", "MI" = "Michigan", "MN" = "Minnesota", "MS" = "Mississippi", "MO" = "Missouri",
+  "MT" = "Montana", "NE" = "Nebraska", "NV" = "Nevada", "NH" = "New Hampshire", "NJ" = "New Jersey",
+  "NM" = "New Mexico", "NY" = "New York", "NC" = "North Carolina", "ND" = "North Dakota", "OH" = "Ohio",
+  "OK" = "Oklahoma", "OR" = "Oregon", "PA" = "Pennsylvania", "RI" = "Rhode Island", "SC" = "South Carolina",
+  "SD" = "South Dakota", "TN" = "Tennessee", "TX" = "Texas", "UT" = "Utah", "VT" = "Vermont",
+  "VA" = "Virginia", "WA" = "Washington", "WV" = "West Virginia", "WI" = "Wisconsin", "WY" = "Wyoming",
+  
+  # Washington, D.C.
+  "DC" = "District of Columbia"
+)
+
+get_state <- function (location){
+  split <- str_split_fixed(location, ", ", 3)
+  
+  for (part in split) {
+    if (part %in% names(state_mapping)) {
+      return(state_mapping[part]) 
+    } 
+    
+     if (part %in% unname(state_mapping)){
+       return(part)
+     }
+  }
+  return(NA)
+}
+
+
+location_2021 <- filtered_2021 %>% mutate(
+  state = map_chr(Location, get_state)) %>% 
+  na.omit()
+
+location_2023 <- filtered_2023 %>% mutate(
+  state = map_chr(Location, get_state)) %>% 
+  na.omit()
+
+```
+
+
+```{r, include=FALSE}
+
+cat("2021 Location", dim(location_2021), "\n")
+cat("2023 Location", dim(location_2023))
+
+
+```
+
+
+
+```{r location-geocode, include=FALSE, eval=FALSE}
+
+Sys.setenv(GOOGLEGEOCODE_API_KEY = "AIzaSyAW9qddQ-j8bXqIqos__dYSV1xrIZSnRDQ")
+register_google(key = Sys.getenv("GOOGLEGEOCODE_API_KEY"))
+
+location_2021 <- location_2021 %>%
+  group_by(state) %>%
+  summarize(Count = n()) %>%
+  filter(!is.na(state) & state != "") %>%  
+  geocode(
+    address = state, 
+    method = "google",
+    lat = "lat", 
+    long = "lon"
+  )
+
+
+location_2023 <- location_2023 %>%
+  group_by(state) %>%
+  summarize(Count = n()) %>%
+  filter(!is.na(state) & state != "") %>%  
+  geocode(
+    address = state, 
+    method = "google",
+    lat = "lat", 
+    long = "lon"
+  )
+
+saveRDS(location_2021, "location_2021.rds")
+saveRDS(location_2023, "location_2023.rds")
+
+```
+
+
+## Premilinary
+
+&emsp; The following figures represent EDA on our variables of interest. All varaibles are either factors or textual, hence visualizations are limited to barcharts listing the (top-n) counts grouped by each feature.
+
+&emsp;Figure 5 shows the comparison of postings in 2021 compared to 2023. Note that this list is not exhaustive of all postings in 2021/2023 and shouldn't be taken as contradictory evidence to the hypothesis. At the time of collection, this was the number of postings available in each year on LinkedIn. It is very possible that the scrapper missed postings, or volumes are lower/higher at the given point of time the scrapper pulled the dataset.
+
+
+```{r count-plot, fig.cap=postings_caption, fig.align='center', echo = FALSE}
+
+postings_caption <- "Figure 5: Comparison of number of postings in 2021 and 2023."
+
+ggplot(postings, aes(x=Year, fill=Year)) +
+  geom_bar(width=0.5) +
+  scale_fill_manual(values = c("lightblue", "royalblue")) +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, fontface = "bold") + 
+  labs(
+    x = "Year",
+    y = "Number of Postings",
+    title = "Number of Postings by Year"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+  )
+
+```
+
+&emsp; Software Engineer, was the most popular role in both years, but the key difference is a lack of specificity in roles in 2023. The 2021, dataset have over 1000 occurances of MLE, Site Reliability Engineer and Data Scientist postings while the second most in the 2023 dataset is 700 postings of Embedded Systems Engineers. If we disregard the notion that the 2023 dataset wasn't scrapping for Data Science related roles, the difference between the 2 years isn't as drastic as we hypothesized.
+
+
+```{r plot-title, fig.cap=titles_caption, fig.height=5, fig.width=12, echo=FALSE}
+
+titles_caption <- "Figure 6: Comparison of top 10 posting titles in 2021 cs 2023."
+
+plot_title_2021 <- ggplot(title_2021, aes(reorder(Role, Count), y=Count, fill=Count)) + 
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+    scale_fill_gradient(low = "lightblue", high = "darkblue", breaks = scales::pretty_breaks(n = 3)) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+    theme_bw() +
+    labs(
+      x = "Role",
+      y = "Frequency",
+      title = "Top 10 Roles in 2021"
+    ) + 
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      legend.position = "bottom",
+      axis.text.y = element_text(angle = 45, hjust = 1)
+    ) +
+    coord_flip() 
+  
+  
+plot_title_2023 <- ggplot(title_2023, aes(reorder(Role, Count), y=Count, fill=Count)) + 
+    geom_bar(stat = "identity") +
+    scale_fill_gradient(low = "lightblue", high = "darkblue") + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+    geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+    theme_bw() +
+    labs(
+      x = "Role",
+      y = "Frequency",
+      title = "Top 10 Roles in 2023"
+    ) + 
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+      legend.position = "bottom",
+      axis.text.y = element_text(angle = 45, hjust = 1)
+    ) +
+    coord_flip() 
+
+
+grid.arrange(plot_title_2021, plot_title_2023, ncol=2)
+
+
+```
+
+&emsp; One noticeable difference between the two years is the desired seniority level. In 2021 there were 2687 postings for entry-level/junior engineer roles and was the most frequent seniority. However, The 2023 dataset saw a large shift towards senior roles with the vast majority of postins being for Senior Engineer (4183) and also increased increased postings for Staff, Principal and Lead Engineer roles.
+
+
+```{r plot-seniority, fig.cap=seniority_caption, fig.width=11, fig.height = 5, echo=FALSE}
+
+seniority_caption <- "Figure 7: Comparison of seniority counts for postings in 2021 vs 2023"
+
+seniority_2021 <- filtered_2021 %>% 
+  group_by(Seniority) %>% 
+  filter( Seniority != "None Specified") %>% 
+  summarise(Count = n())
+
+seniority_2023 <- filtered_2023 %>% 
+  group_by(Seniority) %>% 
+  filter( Seniority != "None Specified") %>% 
+  summarise(Count = n())
+
+
+plot_2021_seniority <-  ggplot(seniority_2021, aes(x=reorder(Seniority, Count), y=Count, fill=Count)) +
+  geom_bar(stat = "identity", width = 0.7)+
+  scale_fill_gradient(
+    low = "lightblue", 
+    high = "darkblue",
+    breaks = scales::pretty_breaks(n = 4)
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+  geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+  coord_flip() +   # coord_flip before theme (preferred style)
+  labs(title = "Seniority Count (2021)", x = "Seniority Level", y = "Count") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 10, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    axis.text.y = element_text(angle = 45, hjust = 1),
+    legend.text = element_text(angle = 45, hjust = 1)
+  )
+
+plot_2023_seniority <- ggplot(seniority_2023, aes(x=reorder(Seniority, Count), y = Count, fill=Count)) +
+  geom_bar(stat = "identity", width = 0.7) +
+    scale_fill_gradient(
+    low = "lightblue", 
+    high = "darkblue",
+    breaks = scales::pretty_breaks(n = 3)
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+  geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+  coord_flip() +
+  theme_bw() +
+  labs(
+    x = "Seniority Level",
+    y = "Count",
+    title = "Seniority Count (2023)"
+  ) + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    legend.position = "bottom",
+    axis.text.y = element_text(angle = 45, hjust = 1),
+    legend.text = element_text(angle = 45, hjust = 1)
+  )
+
+
+grid.arrange(plot_2021_seniority, plot_2023_seniority, ncol=2)
+
+
+```
+
+&emsp; Althought this may be attributed to timing of data collection, companies posting in 2021 are more traditional "big-tech" while most postings from 2023 are more scattered. Apple held of 600 postings followed by Microsoft, Uber, Salesforce all with ~100 postings respectively. According to [Layoffs.fyi](https://layoffs.fyi/) 1,036 tech companies laid off a total of 238,397 employees in the first nine months of 2023. This aligns with the data, showing a lack of postings from popular Saas and Tech Giants. In fact, the most number of postings in 2023 comes from Jobs for Humanity - a platform for  "Connecting historically under represented talent to welcoming employers across the globe". 
+
+```{r top-companies, fig.cap=companies_caption, fig.width=12, fig.height=5, echo=FALSE}
+
+companies_caption <- "Figure 8: Companies of company counts in 2021 vs 2023."
+
+
+company_2021 <- filtered_2021 %>% 
+  group_by(
+    Company
+  ) %>% 
+  summarize(Count = n()) %>% 
+  slice_max(Count, n = 10, with_ties = FALSE)
+
+company_2023 <- filtered_2023 %>% 
+  group_by(
+    Company
+  ) %>% 
+  summarize(Count = n()) %>% 
+ slice_max(Count, n = 10, with_ties = FALSE)
+
+plot_2021_company <- ggplot(company_2021, aes(x=reorder(Company, Count), y = Count, fill=Count)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", breaks = scales::pretty_breaks(n = 3)) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+  geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+  theme_bw() +
+  labs(
+    x = "Company",
+    y = "Frequency",
+    title = "Top 10 Companies in 2021"
+  ) + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    legend.position = "bottom",
+    axis.text.y = element_text(angle = 45, hjust = 1)
+  ) +
+  coord_flip()
+
+plot_2023_company <- ggplot(company_2023, aes(x=reorder(Company, Count), y = Count, fill=Count)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") + 
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.3))) +  
+  geom_text(aes(label = Count), hjust = -0.5, fontface = "bold") + 
+  theme_bw() +
+  labs(
+    x = "Company",
+    y = "Frequency",
+    title = "Top 10 Companies in 2023"
+  ) + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold"),
+    legend.position = "bottom",
+    axis.text.y = element_text(angle = 45, hjust = 1)
+  ) +
+  coord_flip() 
+
+
+grid.arrange(plot_2021_company, plot_2023_company, ncol=2)
+
+```
+&emsp; Figure 9 represents the geographic locations job opportunities. Each bubble, is indicative of the number of postings in the given state; relative to other bubbles on the map. There isn't a significant difference between the two years, both seeing the largest number of postings in California, Texas and New York - the "tech hubs" of the U.S. 
+
+
+```{r create-map, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+register_google("AIzaSyAW9qddQ-j8bXqIqos__dYSV1xrIZSnRDQ")
+map <- get_map(  location = c(left = -135, bottom = 25, right = -60, top = 50), 
+                 source = "google",
+                 size = c(1280, 1280))
+
+```
+
+
+```{r load-locations, echo=FALSE, results='hide'}
+
+if (file.exists("location_2021.rds")) {
+  location_2021 <- readRDS("location_2021.rds")
+} else {
+  stop("Geocoded data for 2021 not found. Run geocoding interactively first.")
+}
+
+if (file.exists("location_2023.rds")) {
+  location_2023 <- readRDS("location_2023.rds")
+} else {
+  stop("Geocoded data for 2023 not found. Run geocoding interactively first.")
+}
+
+```
+
+
+
+```{r plot-state, fig.cap=map_caption, fig.height=6, fig.width=13, warning=FALSE, message=FALSE, echo=FALSE}
+
+map_caption <- "Figure 9: Maps of The United States showing relative postings counts by state."
+
+# 2021 Plot
+plot_2021_locations <- ggmap(map) +
+  geom_point(data = location_2021, aes(x = lon, y = lat, size=Count), 
+             alpha = 0.8, color="blue") + 
+  scale_size_continuous(range = c(1, 8)) +
+  labs(title = "Software Job Posting Locations in 2021") +
+  theme_void() + 
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold", margin = ggplot2::margin(b=10, t=10)),
+    legend.position = "bottom"
+  )
+
+# 2023 Plot
+plot_2023_locations <- ggmap(map) +
+  geom_point(data = location_2023, aes(x = lon, y = lat, size=Count), 
+             alpha = 0.8, color="blue") + 
+  scale_size_continuous(range = c(1, 8)) +
+  labs(title = "Software Job Posting Locations in 2023") +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 10, face = "bold", margin = ggplot2::margin(b=10, t=10)),
+    legend.position = "bottom"
+  )
+
+# Arrange both maps side by side
+grid.arrange(plot_2021_locations, plot_2023_locations, ncol = 2)
+
+```
+
+
+
+```{r description-analysis, include=FALSE}
+
+
+
+```
+
+
+## Summary
+
+### Findings
+
+&emsp; From an initial breakdown of datasets and variables, it was discovered that 2021 and 2023 saw slight differences in metadata associated with postings. Location counts, was the only consistent factor between the two years, while Titles, Seniority and Companies data all support the argument of an increased difficulty for job-seekings in 2023. Many popular destinations didn't post opportunities for New Grads / Entry Levels and sought more senior or leadership positions. 
+
+### Future steps.
+
+&emsp; For the next step of the project, it will tackle NLP and Prediction models. Job skilsets, years of experience, and sentientment can be extracted and compared for the two years. An additionaly dataset containing salaries of SWE jobs in 2023 will be introduced to compare wages. A numeric feature, allows for further exploration of variable relationships such as Title~Salary, Location~Salary, Company~Salary. Resultingly, MLR, GLMM, and Boosting models will be trained on the new data to answer question 2 of our hypothesis - salary prediction.
