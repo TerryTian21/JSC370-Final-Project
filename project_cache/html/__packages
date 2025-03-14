@@ -1,0 +1,16 @@
+reticulate
+ggplot2
+dplyr
+knitr
+data.table
+jsonlite
+kableExtra
+tidyr
+gridExtra
+leaflet
+tidygeocoder
+ggmap
+stringr
+purrr
+spacyr
+scales
