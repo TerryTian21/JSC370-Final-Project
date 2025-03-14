@@ -423,7 +423,7 @@ cat("2023 Location", dim(location_2023))
 
 ```{r location-geocode, include=FALSE, eval=FALSE}
 
-Sys.setenv(GOOGLEGEOCODE_API_KEY = "AIzaSyAW9qddQ-j8bXqIqos__dYSV1xrIZSnRDQ")
+Sys.setenv(GOOGLEGEOCODE_API_KEY = "")
 register_google(key = Sys.getenv("GOOGLEGEOCODE_API_KEY"))
 
 location_2021 <- location_2021 %>%
@@ -663,7 +663,7 @@ grid.arrange(plot_2021_company, plot_2023_company, ncol=2)
 
 ```{r create-map, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
-register_google("AIzaSyAW9qddQ-j8bXqIqos__dYSV1xrIZSnRDQ")
+register_google("")
 map <- get_map(  location = c(left = -135, bottom = 25, right = -60, top = 50), 
                  source = "google",
                  size = c(1280, 1280))
