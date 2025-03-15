@@ -73,8 +73,7 @@ spacy_initialize(model = "en_core_web_sm")
 
 ### Abstract
 
-&emsp; A [report](https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE) by the FRED (Federal Reserve of St. Louis) on labour market conditions highlighted a drastic change in software engineer job postings within the past 5 years. Indexed on $Feb 1, 2020 = 100$, the number of postings expoentially increaes peaking in early 2022 (Index = 240). Yet, seemingly just as rapid, the number of postings fell to a low in late 2023. With numerous tech-unicorns annoucing unprecedneted layoff numbers, the tech bubble has appeared to burst. This  paper will evalute the software/data engineering market in 2021 and 2023, showing the differences in available roles, postings by location, and employee skillset requirements. 
-
+&emsp; A [report](https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE) by the FRED (Federal Reserve of St. Louis) on labour market conditions highlighted a drastic change in software engineer job postings within the past 5 years. Indexed on Feb 1, 2020 = 100, the number of postings exponentially increases, peaking in early 2022 (Index = 240). Yet, seemingly just as rapid, the number of postings fell to a low in late 2023. With numerous tech-unicorns announcing layoffs. The tech bubble has appeared to burst. This paper will evaluate the software/data engineering market in 2021 and 2023, showing the differences in available roles, postings by location, and employee skill-set requirements. 
 
 
 ```{r FRED-graph, fig.align='center', fig.cap=fred_caption, echo=FALSE}
@@ -103,19 +102,21 @@ ggplot(fred, aes(x = Date, y = Index)) +
 
 The two main questions of interest are as follows:
 
-1. What are the differences between 2021 and 2023 postings
-2. Can we use posting-metadata to predict salaries
+1. What are the differences between 2021 and 2023 postings?
+2. Can we use posting-metadata to predict salaries?
 
-The goal of this paper is to provide clarity into why so many engineers have been struggling to find employment opportunities in North America. Three datasets are used to answer the above questions; 2 Kaggle Datasets and a dataset found on Github.
+The goal of this paper is to provide clarity into why so many engineers have been struggling to find employment opportunities in North America. Three datasets are used to answer the above questions; 2 Kaggle datasets and a dataset found on Github.
 
 
 ## Methods
 
 ### Data Summary
 
-&emsp; The first Kaggle dataset was procured by [Yazeed Fares](https://www.kaggle.com/datasets/yazeedfares/software-engineering-jobs-dataset), titled Software Engineering Jobs Dataset. The dataset contains 9380 observations and 8 features and was collected via scrapping LinkedIn Jobs. While the scrapping was performed on Dec. 25, 2023, not all jobs were posted on that specific as LinkedIn retains job postings can stay open for up to 6 months. For the purpose of this exploration, we will assume the jobs in this dataset are respresentative of postings from the latter half of 2023.
+&emsp; The first Kaggle dataset was procured by [Yazeed Fares](https://www.kaggle.com/datasets/yazeedfares/software-engineering-jobs-dataset), titled Software Engineering Jobs Dataset. The dataset contains 9380 observations and 8 features and was collected via scrapping LinkedIn Jobs. Although the scrapping was performed on Dec. 25, 2023, not all jobs were posted on that specific date. LinkedIn retains job postings for up to 6 months. For the purpose of this exploration, we will claim this is a reasonable sample of job postings in 2023.
 
-&emsp; The second dataset was developed by [Mike Lawrence](https://www.kaggle.com/datasets/emreksz/software-engineer-jobs-and-salaries-2024/data), a Machine Learning Engineer at Google. The dataset contains 8261 observations and 13 features. Similarily, this dataset was also collected from scraped LinkedIn postings; collected in October 2021. 
+&emsp; The second dataset uploaded by [Arsh Koneru, Zoey Yu Zou](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings) contains a comprehensive aggregation of LinkedIn Job postings in 2023/2024. This dataset contains a total of 11 .csv files initial stored as tables in a SQL database. However, we are only interested in posting metadata. As a result information on companies, industries, benefits are disregarded. The primary purpose of this dataset, is to supplement salary information for software engineering job postings (not contained in dataset 3).
+
+&emsp; The third dataset was developed by [Mike Lawrence](https://www.kaggle.com/datasets/emreksz/software-engineer-jobs-and-salaries-2024/data), a Machine Learning Engineer at Google. The dataset contains 8261 observations and 13 features. Similarly, this dataset was also collected from scraped LinkedIn postings; collected in October 2021. 
 
 
 ```{r load-data, echo = FALSE, results='hide'}
@@ -142,7 +143,7 @@ kable(names(postings_2023), col.names="Parameters", format = "html", table.attr 
 
 ```
 
-&emsp; Both datasets contain metadata for postings, but not all columns align, and hence we will subset both datasets into matching features for the purpose of comparison. The variables of interes are listed below. After subsetting the data, all NA values are removed.
+&emsp; Since the dimensions of each dataset is different, the first step is to subset datasets into matching features for the purpose of comparison. The variables of interest are listed below. After subsetting the data, all NA values are removed.
 
 
 ```{r join-data, echo=FALSE, results='hide'}
@@ -199,7 +200,7 @@ kable(postings_data, caption=posting_table_caption, format = "html", table.attr 
 
 **Titles**
 
-&emsp; Due to the structure of job titles additional data-wrangling as requirement to get proper categoriazation. For example, variance between each posting could result in different titles corrospond to the same type of position (e.g. Sr. Software Engineer vs. Senior Software Engineer). This would affect `group_by()` functions, resulting in many more categories than necessary. As a result, custom title's are defined based on keyword matches. Using the `case_when()` function, titles are classified from spefic to generic. Thus a title such as "Front-end Software Engineer" gets classified as Frontend Software Engineer rather than Software Engineer.
+&emsp; Due to the structure of job titles additional data-wrangling is required to get proper categorization. For example, variance between each posting could result in different titles representing the same type of position (e.g. Sr. Software Engineer vs. Senior Software Engineer). This would affect `group_by()` functions, resulting in many more categories than necessary. Thus, custom title's are defined based on keyword matches. Using the `case_when()` function, titles are classified from specific to generic. A title like "Front-end Software Engineer" gets classified as Frontend Software Engineer rather than Software Engineer.
 
 
 ```{r wrangle-titles, echo=FALSE, results='hide'}
@@ -287,7 +288,7 @@ kable(role_df, caption=role_patterns_caption, format = "html", table.attr = "sty
 
 **Seniority**
 
-&emsp; Analogous to titles, seniority levels are rather inconsistent between the 2 datasets. In the 2021 dataset are 8 levels of seniority while the 2023 dataset only contains 2 classifications. In order to maintain homogeneity between the classifications in both datasets, custom Seniority levels are defined based on keywords in the title (e.g. Staff ~ Staff Level).
+&emsp; Analogous to titles, seniority levels are rather inconsistent between the 2 datasets. The 2021 dataset has 8 levels of seniority while the 2023 dataset only contains 2 classifications. In order to maintain homogeneity between the classifications in both datasets, custom Seniority levels are defined based on keywords in the title (e.g. Staff ~ Staff Level).
 
 ```{r wrangle-seniority, echo=FALSE, results='hide'}
 
@@ -363,7 +364,7 @@ kable(seniority_df, caption=seniority_patterns_caption, format = "html", table.a
 
 **GeoData**
 
-&emsp; Additionaly wrangling as required to plot Postings Count ~ Location. The provided location data only contains posting location formatted by `City, State`. With a little experimentation, the data was best visualized, grouped by state and hence, latitude and longitude coordinate translation was required. After extracting the State from each location string, the [Google Geocoding API](https://developers.google.com/maps/documentation/geocoding/overview) is used to place coordinates for each state. Entries located outside of the US or with incorrect formatting were dropped leaving 7258 from 2021 and 6948 from 2023.
+&emsp; Additional wrangling was required to plot Postings Count ~ Location. The provided location data only contains posting location formatted by `City, State`. However, graphing libraries (`ggmap`) require latitude and longitude values to plot location data. With some experimentation, the most effective visualization utilized State level groupings to plot posting data. Step 1 was to use regex, and extract state abbreviation from each location string. For the remaining data which contained State information, [Google Geocoding API](https://developers.google.com/maps/documentation/geocoding/overview) was used to translate coordinates for each state. Due to some postings residing outside the United States and unparsable location data, it was not possible to each a State value for every location. 7258 from 2021 and 6948 from 2023 remained available for plotting.
 
 ```{r state-mappings, echo= FALSE, results='hide'}
 
@@ -457,9 +458,9 @@ saveRDS(location_2023, "location_2023.rds")
 
 ## Premilinary
 
-&emsp; The following figures represent EDA on our variables of interest. All varaibles are either factors or textual, hence visualizations are limited to barcharts listing the (top-n) counts grouped by each feature.
+&emsp; The following figures represent EDA on our variables of interest. All variables are either factors or textual, hence visualizations are limited to bar charts listing the (top-n) counts grouped by each feature.
 
-&emsp;Figure 5 shows the comparison of postings in 2021 compared to 2023. Note that this list is not exhaustive of all postings in 2021/2023 and shouldn't be taken as contradictory evidence to the hypothesis. At the time of collection, this was the number of postings available in each year on LinkedIn. It is very possible that the scrapper missed postings, or volumes are lower/higher at the given point of time the scrapper pulled the dataset.
+&emsp;Figure 5 shows the comparison of postings in 2021 to postings in 2023. Note that this list is not exhaustive of all postings in 2021/2023 and shouldn't be taken as contradictory evidence to the hypothesis. At the time of collection, this was the number of postings available on LinkedIn. It is very possible that the scrapper missed postings, or volumes are lower/higher at the given point of time the scrapper aggregated the dataset.
 
 
 ```{r count-plot, fig.cap=postings_caption, fig.align='center', echo = FALSE}
@@ -481,10 +482,10 @@ ggplot(postings, aes(x=Year, fill=Year)) +
 
 ```
 
-&emsp; Software Engineer, was the most popular role in both years, but the key difference is a lack of specificity in roles in 2023. The 2021, dataset have over 1000 occurances of MLE, Site Reliability Engineer and Data Scientist postings while the second most in the 2023 dataset is 700 postings of Embedded Systems Engineers. If we disregard the notion that the 2023 dataset wasn't scrapping for Data Science related roles, the difference between the 2 years isn't as drastic as we hypothesized.
+&emsp; 'Software Engineer' was the most popular role in both years, but the key difference is a lack of specificity for 2023 roles. The 2021 dataset has over 1000 occurances of MLE, Site Reliability Engineer and Data Scientist postings while the second most occurances in the 2023 dataset is 700 postings of Embedded Systems Engineers. If we disregard the notion that the 2023 dataset wasn't scrapping for Data Science related roles, the difference between the 2 years is more reasonable.
 
 
-```{r plot-title, fig.cap=titles_caption, fig.height=5, fig.width=12, echo=FALSE}
+```{r plot-title, fig.cap=titles_caption, fig.height=6, fig.width=13, echo=FALSE}
 
 titles_caption <- "Figure 6: Comparison of top 10 posting titles in 2021 cs 2023."
 
@@ -531,7 +532,7 @@ grid.arrange(plot_title_2021, plot_title_2023, ncol=2)
 
 ```
 
-&emsp; One noticeable difference between the two years is the desired seniority level. In 2021 there were 2687 postings for entry-level/junior engineer roles and was the most frequent seniority. However, The 2023 dataset saw a large shift towards senior roles with the vast majority of postins being for Senior Engineer (4183) and also increased increased postings for Staff, Principal and Lead Engineer roles.
+&emsp; One noticeable difference, however, is the desired seniority level. In 2021 there were 2687 postings for entry-level/junior engineer roles and was the most frequent seniority. However, The 2023 dataset saw a large shift towards senior roles with the vast majority of postins being for Senior Engineer (4183) and also increased increased postings for Staff, Principal and Lead Engineer roles.
 
 
 ```{r plot-seniority, fig.cap=seniority_caption, fig.width=11, fig.height = 5, echo=FALSE}
@@ -597,7 +598,7 @@ grid.arrange(plot_2021_seniority, plot_2023_seniority, ncol=2)
 
 ```
 
-&emsp; Althought this may be attributed to timing of data collection, companies posting in 2021 are more traditional "big-tech" while most postings from 2023 are more scattered. Apple held of 600 postings followed by Microsoft, Uber, Salesforce all with ~100 postings respectively. According to [Layoffs.fyi](https://layoffs.fyi/) 1,036 tech companies laid off a total of 238,397 employees in the first nine months of 2023. This aligns with the data, showing a lack of postings from popular Saas and Tech Giants. In fact, the most number of postings in 2023 comes from Jobs for Humanity - a platform for  "Connecting historically under represented talent to welcoming employers across the globe". 
+&emsp; Althought its possibly attributed to timing of data collection, companies posting in 2021 are more traditional "big-tech" while most postings from 2023 are scattered. In 2021, Apple posted 600 openings followed by Microsoft, Uber, Salesforce all with ~100 postings respectively. 2023 saw a different demographic. There was a lack of postings from popular Saas and Tech Giants. In fact, the most number of postings in 2023 comes from Jobs for Humanity - a platform for  "Connecting historically under represented talent to welcoming employers across the globe". This is not anomalous. According to [Layoffs.fyi](https://layoffs.fyi/) 1,036 tech companies laid off a total of 238,397 employees in the first nine months of 2023. Therefore, we would expect to see more postings come from niche sectors like U.S. Defence (Northrop Grunman) and recruiting agencies ( Recruiting from Scratch & IP Recruiter Group). 
 
 ```{r top-companies, fig.cap=companies_caption, fig.width=12, fig.height=5, echo=FALSE}
 
@@ -658,15 +659,17 @@ plot_2023_company <- ggplot(company_2023, aes(x=reorder(Company, Count), y = Cou
 grid.arrange(plot_2021_company, plot_2023_company, ncol=2)
 
 ```
-&emsp; Figure 9 represents the geographic locations job opportunities. Each bubble, is indicative of the number of postings in the given state; relative to other bubbles on the map. There isn't a significant difference between the two years, both seeing the largest number of postings in California, Texas and New York - the "tech hubs" of the U.S. 
+&emsp; Figure 9 represents the geographic locations of job postings. Each bubble, is indicative of the number of postings in the given state; relative to other bubbles on the map. There isn't a significant difference between the two years, both seeing the largest number of postings in California, Texas and New York - the "tech hubs" of the U.S. 
 
 
-```{r create-map, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r create-map, include=FALSE}
 
-register_google("")
+register_google("AIzaSyAW9qddQ-j8bXqIqos__dYSV1xrIZSnRDQ")
 map <- get_map(  location = c(left = -135, bottom = 25, right = -60, top = 50), 
                  source = "google",
                  size = c(1280, 1280))
+saveRDS(map, "saved_map.rds")
+
 
 ```
 
@@ -685,6 +688,11 @@ if (file.exists("location_2023.rds")) {
   stop("Geocoded data for 2023 not found. Run geocoding interactively first.")
 }
 
+if (file.exists("saved_map.rds")){
+  map <- readRDS("saved_map.rds")
+} else {
+  stop("Map found. Run map generation interactively first.")
+}
 ```
 
 
@@ -735,8 +743,8 @@ grid.arrange(plot_2021_locations, plot_2023_locations, ncol = 2)
 
 ### Findings
 
-&emsp; From an initial breakdown of datasets and variables, it was discovered that 2021 and 2023 saw slight differences in metadata associated with postings. Location counts, was the only consistent factor between the two years, while Titles, Seniority and Companies data all support the argument of an increased difficulty for job-seekings in 2023. Many popular destinations didn't post opportunities for New Grads / Entry Levels and sought more senior or leadership positions. 
+&emsp; From an initial breakdown of datasets and variables, it was discovered that 2021 and 2023 saw differences in metadata associated with postings. Location counts, was the only consistent factor between the two years, while Titles, Seniority and Companies data all support the argument of an increased difficulty for job-seekers in 2023. Many popular destinations didn't post opportunities for New Grads / Entry Levels and sought more senior or leadership positions. 
 
 ### Future steps.
 
-&emsp; For the next step of the project, it will tackle NLP and Prediction models. Job skilsets, years of experience, and sentientment can be extracted and compared for the two years. An additionaly dataset containing salaries of SWE jobs in 2023 will be introduced to compare wages. A numeric feature, allows for further exploration of variable relationships such as Title~Salary, Location~Salary, Company~Salary. Resultingly, MLR, GLMM, and Boosting models will be trained on the new data to answer question 2 of our hypothesis - salary prediction.
+&emsp; The next step of the project will tackle NLP and Prediction models. Job skillsets, years of experience, and sentiment can be extracted and compared for the two years. An additionaly dataset (dataset 2) containing salaries of SWE jobs in 2023 will be introduced to compare wages. A numeric feature, allows for further exploration of variable relationships such as Title~Salary, Location~Salary, Company~Salary. Resultingly, MLR, GLMM, and Boosting models will be trained on the new data to answer question 2 of our hypothesis - salary prediction.
