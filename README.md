@@ -16,6 +16,7 @@ This project analyzes the software engineering job market by comparing data from
 - Machine learning models for salary prediction
 
 ## Project Website
+
 Explore the interactive version of this analysis at: [JSC370 Project Website](https://terrytian21.github.io/JSC370-Project-Website)
 
 ## Author

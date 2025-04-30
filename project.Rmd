@@ -96,14 +96,14 @@ spacy_initialize(model = "en_core_web_sm")
 
 [**Project Website**](https://terrytian21.github.io/JSC370-Project-Website)
 
-Note: For a better viewing experience, see open the html file linked in the Github repository.
+Note: For a better viewing experience, open the html version of this pdf in your web browser. (Found in Github Repo)
 
 
 ## Introduction
 
 ### Abstract
 
-A [report](https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE) by the FRED (Federal Reserve of St. Louis) on labour market conditions highlighted a drastic change in software engineer job postings on Indeed within the past 5 years. Indexed on Feb 1, 2020 = 100, the number of postings exponentially increases, peaking in early 2022 (Index = 240). Yet, seemingly just as rapid, the number of postings fell to a low in late 2023. With numerous tech-unicorns announcing layoffs. The tech bubble has appeared to burst. This paper will evaluate the software/data engineering market in 2021 and 2023, showing the differences in available roles, postings by location, and employee skill-set requirements. 
+A [report](https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE) by the FRED (Federal Reserve of St. Louis) on labor market conditions highlighted a drastic change in software engineer job postings on Indeed within the past 5 years. Indexed on Feb 1, 2020 = 100, the number of postings exponentially increased, peaking in early 2022 (Index = 240). Yet, seemingly just as rapidly, the number of postings fell to a low in late 2023, with numerous tech-unicorns announcing layoffs. The tech bubble has appeared to burst. This paper will evaluate the software/data engineering market in 2021 and 2023, showing the differences in available roles, postings by location, and employee skill-set requirements. 
 
 
 ```{r FRED-graph, fig.align='center', fig.cap=fred_caption, fig.height=4, fig.width= 4, echo=FALSE}
@@ -142,7 +142,7 @@ The goal of this paper is to provide clarity into why so many engineers have bee
 
 ### Data Summary
 
-The first Kaggle dataset was procured by [Yazeed Fares](https://www.kaggle.com/datasets/yazeedfares/software-engineering-jobs-dataset), titled Software Engineering Jobs Dataset. The dataset contains 9380 observations and 8 features and was collected via scrapping LinkedIn Jobs. Although the scrapping was performed on Dec. 25, 2023, not all jobs were posted on that specific date. LinkedIn retains job postings for up to 6 months. For this exploration, we will claim this is a reasonable sample of job postings in 2023.
+The first Kaggle dataset was procured by [Yazeed Fares](https://www.kaggle.com/datasets/yazeedfares/software-engineering-jobs-dataset), titled Software Engineering Jobs Dataset. The dataset contains 9380 observations and 8 features and was collected via scrapping LinkedIn Jobs. Although the scraping was performed on Dec. 25, 2023, not all jobs were posted on that specific date. LinkedIn retains job postings for up to 6 months. For this exploration, we will claim this is a reasonable sample of job postings in 2023.
 
 
 The second dataset was developed by [Mike Lawrence](https://github.com/Mlawrence95/LinkedIn-Tech-Job-Data), a Machine Learning Engineer at Google. The dataset contains 8261 observations and 13 features. Similarly, this dataset was also collected from scraped LinkedIn postings; collected in October 2021. 
@@ -154,6 +154,7 @@ postings_2021 <- fread("./data/2021.csv")
 postings_2023 <- fread("./data/2023.csv")
 
 ```
+
 
 ```{r data-dim, echo = FALSE, results='hide'}
 
@@ -172,7 +173,7 @@ kable(names(postings_2023), col.names="Parameters") %>%
 
 ```
 
-Since the dimensions of each dataset is different, the first step is to subset datasets into matching features for the purpose of comparison. The variables of interest are listed below. After subsetting the data, all NA values are removed.
+Since the dimensions of each dataset are different, the first step is to subset datasets into matching features for the purpose of comparison. The variables of interest are listed below. After subsetting the data, all NA values are removed.
 
 
 
@@ -872,7 +873,7 @@ grid.arrange(plot_2021_seniority, plot_2023_seniority, ncol=2)
 
 **Company**
 
-Althought its possibly attributed to timing of data collection, companies posting in 2021 are more traditional "big-tech" while most postings from 2023 are scattered. In 2021, Apple posted 600 openings followed by Microsoft, Uber, Salesforce all with ~100 postings respectively. 2023 saw a different demographic. There was a lack of postings from popular Saas and Tech Giants. In fact, the most number of postings in 2023 comes from Jobs for Humanity - a platform for  "Connecting historically under represented talent to welcoming employers across the globe". This is not anomalous. According to [Layoffs.fyi](https://layoffs.fyi/) 1,036 tech companies laid off a total of 238,397 employees in the first nine months of 2023. Therefore, we would expect to see more postings come from niche sectors like U.S. Defence (Northrop Grunman) and recruiting agencies ( Recruiting from Scratch & IP Recruiter Group). 
+Although it's possibly attributed to timing of data collection, companies posting in 2021 are more traditional "big-tech" while most postings from 2023 are scattered. In 2021, Apple posted 600 openings followed by Microsoft, Uber, Salesforce all with ~100 postings respectively. 2023 saw a different demographic. There was a lack of postings from popular Saas and Tech Giants. In fact, the most number of postings in 2023 comes from Jobs for Humanity - a platform for  "Connecting historically under represented talent to welcoming employers across the globe". This is not anomalous. According to [Layoffs.fyi](https://layoffs.fyi/) 1,036 tech companies laid off a total of 238,397 employees in the first nine months of 2023. Therefore, we would expect to see more postings come from niche sectors like U.S. Defence (Northrop Grunman) and recruiting agencies ( Recruiting from Scratch & IP Recruiter Group). 
 
 ```{r top-companies, fig.cap=companies_caption, fig.width=12, fig.height=5, echo=FALSE}
 
@@ -1358,3 +1359,5 @@ kable(results, caption = "Table 6: RMSE Results on Test Set") %>%
 ```
 
 
+
+```
